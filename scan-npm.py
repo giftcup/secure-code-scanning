@@ -47,8 +47,7 @@ def get_node_versions(data, versions_list):
             get_node_versions(item, versions_list)
 
 
-json_file_path = '/Users/tambe/Documents/workspace/language_crowdsource/frontend/package-lock.json'
-
+json_file_path = input("Enter path to package.json file")
 supported_versions = get_supported_node_version()
 node_versions_list = []
 

@@ -18,7 +18,6 @@ def get_node_versions(data, versions_list):
                 for version in versions:
                     cleaned_version = clean_version(version)
                     versions_list.append(cleaned_version)
-        # Recursively call the function for nested dictionaries
         for key, value in data.items():
             get_node_versions(value, versions_list)
     elif isinstance(data, list):
@@ -27,7 +26,7 @@ def get_node_versions(data, versions_list):
             get_node_versions(item, versions_list)
 
 # Specify the path to your JSON file
-json_file_path = '/Users/tambe/Documents/workspace/language_crowdsource/frontend/package-lock.json'
+json_file_path = input("Enter packet.json file path: ")
 
 # List to store cleaned versions
 node_versions_list = []
