@@ -10,21 +10,23 @@ def get_dependencies(package_json) :
     dependencies = package_json.get("dependencies", {})
     devDependencies = package_json.get("devDependencies", {})
     all_dependencies = {**dependencies, **devDependencies}
-    print(all_dependencies)
     return all_dependencies
 
 def get_vulnerabilities(package_name, package_version, package_ecosystem="npm") :
     headers = {"Content-Type": "application/json"}
     url = "https://api.osv.dev/v1/query"
     query = {
-        "version": package_version, 
         "package": {
             "name": package_name,
             "ecosystem": package_ecosystem
         }
     }
 
-    response = requests.post(url, data = json.dumps(query), headers = headers)
+    try:
+        response = requests.post(url, data = json.dumps(query), headers = headers)
+    except Exception as e:
+        print(f"Error: {e}")
+
 
     if response.status_code == 200:
         vulnerabilities = response.json()
@@ -46,18 +48,19 @@ def main() :
         vulnerabilities = get_vulnerabilities(package_name, package_version)
 
         if vulnerabilities:
-            print(f"Vulnerabilities found for {package_name}@{package_version}:")
 
             for vulnerability in vulnerabilities['vulns']:
                 vulnerability_id = vulnerability['id']
                 vulnerability_summary = vulnerability['summary']
+                vulnerability_versions = vulnerability.get("affected", []).get("versions", [])
 
                 vulnerability_dictionary[vulnerability_id] = vulnerability_summary
                 print("💣------------------------------------")
+                print(f"\tVulnerabilities found for {package_name}@{package_version}:")
                 print(f"\tID: {vulnerability_id}")
                 print(f"\tSummary: {vulnerability_summary}")
+                print(f"\tSummary: {vulnerability_versions}")
                 print("💣------------------------------------")
-            print(f"{vulnerability_dictionary}")
     
     if not vulnerability_dictionary:
         print("\nHurray🎉🎉, you're package.json is free of vulnerabilities💃💃\n")              
