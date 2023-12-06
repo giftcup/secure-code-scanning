@@ -1,0 +1,7 @@
+- name: "Avoid running as root"
+  description: "Check if processes run as root in Dockerfile"
+  pattern: "USER\\s+root"
+
+- name: "Copy only neccessary files"
+  description: "Copy only neccessary file to the docker image to reduce the attack surface"
+  pattern: "COPY\\s+\\.\\s+\\."
