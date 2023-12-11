@@ -1,7 +1,15 @@
+- name: "Using the latest tag"
+  description: "Tie the docker image to a particular version to avoid introducing unknown vulnerabilities"
+  pattern: "^FROM\\s+\\S+\\s*:\\s*latest\\s*$"
+
 - name: "Avoid running as root"
   description: "Check if processes run as root in Dockerfile"
   pattern: "USER\\s+root"
 
 - name: "Copy only neccessary files"
   description: "Copy only neccessary file to the docker image to reduce the attack surface"
-  pattern: "COPY\\s+\\.\\s+\\."
+  pattern: "COPY\\s+.\\s+.$"
+
+- name: "Secrets seem to be exposed"
+  description: "Directly hardcoding secrets is dangerous"
+  pattern: "(?i)(secret|password|key|token)]"

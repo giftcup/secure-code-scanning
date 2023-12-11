@@ -1,6 +1,7 @@
 import yaml
 import re
 from dockerfile_parse import DockerfileParser
+import requests
 
 def parse_dockerfile(dockerfile) :
     parser = DockerfileParser()
@@ -9,8 +10,6 @@ def parse_dockerfile(dockerfile) :
     instructions = parser.structure
 
     return instructions
-
-    # print(f"{instructions}")
 
 def read_file(file_path):
     try:
@@ -24,35 +23,58 @@ def read_file(file_path):
         exit()
     return file
 
-def check_dockerfile_violations(docker_content, rules):
+def get_latest_tag_from_registry(image_name):
+    api_url = f"https://hub.docker.com/v2/repositories/{image_name}/tags"
+    response = requests.get(api_url)
+
+    if response.status_code == 200:
+        data = response.json()
+        tags = data.get('results', [])
+
+        if tags:
+            latest_tag = tags[0].get('name')
+            return latest_tag
+        else:
+            return None
+    else:
+        return None
+        
+
+def check_dockerfile_violations(instructions, rules):
     violations = []
-    
+
     for rule in rules:
         pattern = re.compile(rule['pattern'])
-        if (pattern.search(docker_content)):
-            violations.append({
-                'rule_name': rule['name'],
-                'description': rule['description']
-            })
+        print(pattern)
+        for instruction in instructions:
+            if (instruction['instruction'] == 'COMMENT'):
+                continue
+            if (pattern.match(instruction['content'])):
+                violations.append({
+                    'rule_name': rule['name'],
+                    'description': rule['description'],
+                    'line': instruction['startline'] + 1
+                })
 
     return violations
 
 def main():
-    dockerfile_path = "/Users/pro-3is/Documents/workspace/secure-code-scanning/VulDocker/Dockerfile"
+    dockerfile_path = "./Dockerfile"
     dockerfile_content = read_file(dockerfile_path)
     instructions = parse_dockerfile(dockerfile_content)
 
     rule_path = "./security_rules.yaml"
     security_rules = read_file(rule_path)
     security_rules = yaml.safe_load(security_rules)
-    violations = check_dockerfile_violations(dockerfile_content, security_rules)
+    violations = check_dockerfile_violations(dockerfile_content, instructions, security_rules)
     
-    print(violations)
+    print("💣------------------------------------")
     
     for violation in violations:
-        print("💣------------------------------------")
-        print(f"\t{violation['rule_name']}")
+        print(f"\t\033[91m{violation['rule_name']} on line {violation['line']}\033[0m")
         print(f"\tDescription: {violation['description']}")
-        print("💣------------------------------------")
-        print("\n\n")
+        print("\n")
+
+    print("💣------------------------------------")
+
 main()
