@@ -2,6 +2,7 @@ import yaml
 import re
 from dockerfile_parse import DockerfileParser
 import requests
+import subprocess
 
 def parse_dockerfile(dockerfile) :
     parser = DockerfileParser()
@@ -15,13 +16,11 @@ def read_file(file_path):
     try:
         with open(file_path, 'r') as file:
             file = file.read()
+            return file
     except FileNotFoundError:
-        print(f"The file path {file_path} doesn't exist.")
-        exit()
+        return None
     except IOError:
-        print(f"An error occured when trying to read file from {file_path}")
-        exit()
-    return file
+        return None
 
 def get_latest_tag_from_registry(image_name):
     api_url = f"https://hub.docker.com/v2/repositories/{image_name}/tags"
@@ -38,17 +37,53 @@ def get_latest_tag_from_registry(image_name):
             return None
     else:
         return None
-        
+    
+def compare_image_version(image_name, image_version):
+    latest_version = get_latest_tag_from_registry(image_name)
+
+    if image_version != latest_version:
+        return True
+    return False
+
+def find_image_vuln_with_snyk(image_name, image_version):
+    command = ["snyk", "container", "test", f"{image_name}:{image_version}", "--json"]
+
+    try:
+        result = subprocess.run(command, capture_output=True, text=True, check=True)
+        print(result.stdout)
+
+    except subprocess.CalledProcessError as e:
+        print(f"Error running the Synk command: {e}")
+        print(e.stderr)
+        return None
+
 
 def check_dockerfile_violations(instructions, rules):
     violations = []
 
-    for rule in rules:
-        pattern = re.compile(rule['pattern'])
-        print(pattern)
-        for instruction in instructions:
-            if (instruction['instruction'] == 'COMMENT'):
-                continue
+    for instruction in instructions:
+        if (instruction['instruction'].upper() == 'COMMENT'):
+            continue
+        if (instruction['instruction'].upper() == 'FROM'):
+            image_pattern = r'([\w.-]+)(?::([\w.-]+)?)'
+            match = re.match(image_pattern, instruction['value'])
+
+            if match:
+                image_name = match.group(1)
+                image_version = match.group(2) or 'latest'
+            
+                if compare_image_version(image_name, image_version):
+                    violations.append({
+                        'rule_name': "Outdated image version",
+                        'description': 'The version of your image is out of date',
+                        'line': instruction['startline'] + 1
+                    })
+                
+                find_image_vuln_with_snyk(image_name, image_version)
+
+        for rule in rules:
+            pattern = re.compile(rule['pattern'])
+
             if (pattern.match(instruction['content'])):
                 violations.append({
                     'rule_name': rule['name'],
@@ -59,14 +94,31 @@ def check_dockerfile_violations(instructions, rules):
     return violations
 
 def main():
-    dockerfile_path = "./Dockerfile"
+    dockerfile_path = './Dockerfile'
     dockerfile_content = read_file(dockerfile_path)
+
+    if not dockerfile_content:
+        print("\n\033[91m⚠️⚠️ Dockerfile doesn't exist in directory structure\033[0m")
+        print("Ensure the name is exactly \033[1mDockerfile\033[0m\n")
+        print("Exiting program ...")
+        exit()
+    
     instructions = parse_dockerfile(dockerfile_content)
 
     rule_path = "./security_rules.yaml"
     security_rules = read_file(rule_path)
+    
+    if not security_rules:
+        print("\n\033[33m⚠️⚠️ No security rules defined\033[0m")
+        print("Exiting program ...")
+        exit()
+
     security_rules = yaml.safe_load(security_rules)
-    violations = check_dockerfile_violations(dockerfile_content, instructions, security_rules)
+    violations = check_dockerfile_violations(instructions, security_rules)
+
+    if not violations:
+        print("\nHurray🎉🎉, your Dockerfile is free of vulnerabilities💃\n")
+        exit()
     
     print("💣------------------------------------")
     
