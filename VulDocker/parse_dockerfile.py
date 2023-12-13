@@ -1,8 +1,7 @@
-import yaml
-import re
+import re, json, yaml, subprocess
 from dockerfile_parse import DockerfileParser
 import requests
-import subprocess
+import pandas as pd
 
 def parse_dockerfile(dockerfile) :
     parser = DockerfileParser()
@@ -46,12 +45,26 @@ def compare_image_version(image_name, image_version):
     return False
 
 def find_image_vuln_with_snyk(image_name, image_version):
-    command = ["snyk", "container", "test", f"{image_name}:{image_version}", "--json"]
+    command = ['snyk', 'container', 'test', f'{image_name}:{image_version}', '--json']
 
     try:
-        result = subprocess.run(command, capture_output=True, text=True, check=True)
-        print(result.stdout)
+        result = subprocess.run(command, capture_output=True, text=True)
 
+        try:
+            result = json.loads(result.stdout)
+        except json.JSONDecodeError as e:
+            print(f"Error decoding json output: {e}")
+            return None
+        
+        if not result['vulnerabilities']:
+            return None
+        else:
+            vulnerabilities = result['vulnerabilities']
+            df = pd.DataFrame(vulnerabilities)
+            unique_df = df.drop_duplicates(subset='title')
+            vulnerabilities = unique_df.to_dict(orient='records')
+            return vulnerabilities[:3]
+        
     except subprocess.CalledProcessError as e:
         print(f"Error running the Synk command: {e}")
         print(e.stderr)
@@ -79,7 +92,18 @@ def check_dockerfile_violations(instructions, rules):
                         'line': instruction['startline'] + 1
                     })
                 
-                find_image_vuln_with_snyk(image_name, image_version)
+                image_vulnerabilities = find_image_vuln_with_snyk(image_name, image_version)
+
+                if not image_vulnerabilities:
+                    continue
+
+                for vulnerability in image_vulnerabilities:
+                    violations.append({
+                        'rule_name': vulnerability['title'],
+                        'description': vulnerability['description'],
+                        'line': instruction['startline'] + 1
+                        'severity': vulnerability['severity']
+                    })
 
         for rule in rules:
             pattern = re.compile(rule['pattern'])
@@ -89,6 +113,7 @@ def check_dockerfile_violations(instructions, rules):
                     'rule_name': rule['name'],
                     'description': rule['description'],
                     'line': instruction['startline'] + 1
+                    'severity': rule['severity'] or None
                 })
 
     return violations
