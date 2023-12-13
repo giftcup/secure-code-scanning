@@ -101,7 +101,7 @@ def check_dockerfile_violations(instructions, rules):
                     violations.append({
                         'rule_name': vulnerability['title'],
                         'description': vulnerability['description'],
-                        'line': instruction['startline'] + 1
+                        'line': instruction['startline'] + 1,
                         'severity': vulnerability['severity']
                     })
 
@@ -112,7 +112,7 @@ def check_dockerfile_violations(instructions, rules):
                 violations.append({
                     'rule_name': rule['name'],
                     'description': rule['description'],
-                    'line': instruction['startline'] + 1
+                    'line': instruction['startline'] + 1,
                     'severity': rule['severity'] or None
                 })
 
